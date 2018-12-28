@@ -12,11 +12,13 @@ from keras import backend as K
 from keras.models import load_model
 from keras.layers import Input
 from PIL import Image, ImageFont, ImageDraw
-
+import tensorflow as tf
 from yolo3.model import yolo_eval, yolo_body, tiny_yolo_body
 from yolo3.utils import letterbox_image
 import os
 from keras.utils import multi_gpu_model
+TPU_WORKER = 'grpc://' + os.environ['COLAB_TPU_ADDR']
+tf.logging.set_verbosity(tf.logging.INFO)
 
 class YOLO(object):
     _defaults = {
@@ -67,8 +69,11 @@ class YOLO(object):
         num_classes = len(self.class_names)
         is_tiny_version = num_anchors==6 # default setting
         try:
+            print('level1')
             self.yolo_model = load_model(model_path, compile=False)
+            self.yolo_model=tf.contrib.tpu.keras_to_tpu_model(self.yolo_model,strategy=tf.contrib.tpu.TPUDistributionStrategy(tf.contrib.cluster_resolver.TPUClusterResolver(TPU_WORKER)))
         except:
+            print('level2')
             self.yolo_model = tiny_yolo_body(Input(shape=(None,None,3)), num_anchors//2, num_classes) \
                 if is_tiny_version else yolo_body(Input(shape=(None,None,3)), num_anchors//3, num_classes)
             self.yolo_model.load_weights(self.model_path) # make sure model, anchors and classes match
